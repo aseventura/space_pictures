@@ -1,6 +1,7 @@
 import os
 import requests
 import datetime
+import telegram
 from pathlib import Path
 from urllib import parse
 from dotenv import load_dotenv
@@ -95,12 +96,17 @@ def fetch_nasa_epic(nasa_api_key: str):
         )
 
 
+def send_message_in_channel(telegram_bot_token: str, telegram_chat_id: str):
+    bot = telegram.Bot(telegram_bot_token)
+    bot.send_message(text='Привет из бота :)', chat_id=telegram_chat_id)
+
+
 def main():
     load_dotenv()
     NASA_API_KEY = os.getenv('NASA_API_KEY')
-    fetch_spacex_last_launch()
-    fetch_nasa_apod(50, NASA_API_KEY)
-    fetch_nasa_epic(NASA_API_KEY)
+    TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+    TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+    send_message_in_channel(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
 
 
 if __name__ == '__main__':
