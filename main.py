@@ -60,8 +60,8 @@ def fetch_nasa_apod(pictures_pcs: int, nasa_api_key: str):
     response.raise_for_status()
     pictures_url = response.json()
     for index, picture_metadata in enumerate(pictures_url, 1):
-        image_link = picture_metadata.get('hdurl')
-        if image_link:
+        if picture_metadata['media_type'] == 'image':
+            image_link = picture_metadata['url']
             file_extension = get_file_extension(image_link)
             filename = f'apod_{index}{file_extension}'
             picture_path = f'{pictures_dir}/{filename}'
@@ -98,7 +98,7 @@ def fetch_nasa_epic(nasa_api_key: str):
 
 def send_message_in_channel(telegram_bot_token: str, telegram_chat_id: str):
     bot = telegram.Bot(telegram_bot_token)
-    bot.send_message(text='Привет из бота :)', chat_id=telegram_chat_id)
+    bot.send_photo(chat_id=telegram_chat_id, photo=open('APOD/apod_43.jpg', 'rb'))
 
 
 def main():
@@ -106,6 +106,9 @@ def main():
     NASA_API_KEY = os.getenv('NASA_API_KEY')
     TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
     TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+    fetch_spacex_last_launch()
+    fetch_nasa_apod(50, NASA_API_KEY)
+    fetch_nasa_epic(NASA_API_KEY)
     send_message_in_channel(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
 
 
