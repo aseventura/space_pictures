@@ -1,6 +1,7 @@
 import os
 import requests
 import datetime
+import time
 import telegram
 from pathlib import Path
 from urllib import parse
@@ -26,13 +27,13 @@ def get_file_extension(url: str):
     return file_extension
 
 
-def fetch_spacex_last_launch():
-    pictures_dir = 'SpaceX'
+def fetch_spacex_last_launch(pictures_dir: str):
     create_directory(pictures_dir)
     base_url = 'https://api.spacexdata.com/v3/rockets/falconheavy'
-    ''' More beautifull pictures:
-        https://api.spacexdata.com/v3/rockets/starship
-        https://api.spacexdata.com/v3/rockets/falcon9
+    '''
+    More beautifull pictures:
+    https://api.spacexdata.com/v3/rockets/starship
+    https://api.spacexdata.com/v3/rockets/falcon9
     '''
     response = requests.get(base_url)
     response.raise_for_status()
@@ -41,15 +42,17 @@ def fetch_spacex_last_launch():
         file_extension = get_file_extension(url)
         filename = f'falconheavy_{index}{file_extension}'
         picture_path = f'{pictures_dir}/{filename}'
-        download_picture(
-            url=url,
-            payload='',
-            picture_path=picture_path,
-        )
+        try:
+            download_picture(
+                url=url,
+                payload='',
+                picture_path=picture_path,
+            )
+        except requests.models.HTTPError:
+            print('Не смог получить картинку')
 
 
-def fetch_nasa_apod(pictures_pcs: int, nasa_api_key: str):
-    pictures_dir = 'APOD'
+def fetch_nasa_apod(pictures_dir: str, pictures_pcs: int, nasa_api_key: str):
     create_directory(pictures_dir)
     base_url = 'https://api.nasa.gov/planetary/apod'
     payloads = {
@@ -65,15 +68,17 @@ def fetch_nasa_apod(pictures_pcs: int, nasa_api_key: str):
             file_extension = get_file_extension(image_link)
             filename = f'apod_{index}{file_extension}'
             picture_path = f'{pictures_dir}/{filename}'
-            download_picture(
-                url=image_link,
-                payload='',
-                picture_path=picture_path,
-            )
+            try:
+                download_picture(
+                    url=image_link,
+                    payload='',
+                    picture_path=picture_path,
+                )
+            except requests.models.HTTPError:
+                print('Не смог получить картинку')
 
 
-def fetch_nasa_epic(nasa_api_key: str):
-    pictures_dir = 'EPIC'
+def fetch_nasa_epic(pictures_dir: str, nasa_api_key: str):
     create_directory(pictures_dir)
     base_url = 'https://api.nasa.gov/EPIC/'
     payload = {
@@ -89,27 +94,40 @@ def fetch_nasa_epic(nasa_api_key: str):
         file_extension = '.png'
         image_link = f'{base_url}archive/natural/{date_of_creation}/png/{filename}{file_extension}'
         picture_path = f'{pictures_dir}/{filename}{file_extension}'
-        download_picture(
-            url=image_link,
-            payload=payload,
-            picture_path=picture_path,
-        )
+        try:
+            download_picture(
+                url=image_link,
+                payload=payload,
+                picture_path=picture_path,
+            )
+        except requests.models.HTTPError:
+            print('Не смог получить картинку')
 
 
-def send_message_in_channel(telegram_bot_token: str, telegram_chat_id: str):
+def send_pictures_in_telegram_channel(telegram_bot_token: str, telegram_chat_id: str, picture_path: str):
     bot = telegram.Bot(telegram_bot_token)
-    bot.send_photo(chat_id=telegram_chat_id, photo=open('APOD/apod_43.jpg', 'rb'))
+    bot.send_photo(chat_id=telegram_chat_id, photo=open(picture_path, 'rb'))
 
 
 def main():
     load_dotenv()
     NASA_API_KEY = os.getenv('NASA_API_KEY')
     TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-    TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
-    fetch_spacex_last_launch()
-    fetch_nasa_apod(50, NASA_API_KEY)
-    fetch_nasa_epic(NASA_API_KEY)
-    send_message_in_channel(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
+    TELEGRAM_CHANNEL_ID = os.getenv('TELEGRAM_CHANNEL_ID')
+    INTERVAL_TO_PUBLISH = int(os.getenv('INTERVAL_TO_PUBLISH'))
+    directories = ('SpaceX', 'APOD', 'EPIC')
+    try:
+        fetch_spacex_last_launch(directories[0])
+        fetch_nasa_apod(directories[1], 50, NASA_API_KEY)
+        fetch_nasa_epic(directories[2], NASA_API_KEY)
+    except requests.models.HTTPError:
+        print('Некорректный ответ сервера')
+    while True:
+        for directory in directories:
+            for picture_name in os.listdir(directory):
+                picture_path = os.path.join(directory, picture_name)
+                send_pictures_in_telegram_channel(TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL_ID, picture_path)
+                time.sleep(INTERVAL_TO_PUBLISH)
 
 
 if __name__ == '__main__':
